@@ -1,0 +1,1 @@
+import{_ as n,c as o,a as r,o as t}from"./index-f4UEXm-2.js";const a={};function s(c,e){return t(),o("div",null,e[0]||(e[0]=[r("h1",null,"Unauthorized",-1)]))}const d=n(a,[["render",s]]);export{d as default};
