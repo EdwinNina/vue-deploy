@@ -1,107 +1,103 @@
+import type { SystemData, SystemLogin, Tokens, User } from '@/types/auth.types';
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import { decryptData } from '@/utils/encryption'
-import type { Module, Role, SystemData, Tokens, User } from '@/types/auth.types'
+import { computed, ref } from 'vue'
 
 export const useAuthStore = defineStore('auth', () => {
-    const tokens = ref<Tokens | null>(null)
-    const systemData = ref<SystemData | null>(null)
-    const user = ref<User | null>(null)
-    const isAuthenticated = ref(false)
+    const tokens = ref<Tokens | null>(null);
+    const user = ref<User | null>(null);
+    const systemData = ref<SystemData | null>(null);
 
-    async function initializeFromParams(encryptedParams: string) {
-        console.log(encryptedParams)
-        try {
-            // Desencriptar datos
-            const decryptedData = await decryptData(encryptedParams)
-            if (!decryptedData || typeof decryptedData !== 'object') {
-                throw new Error('Los datos desencriptados no son válidos')
-            }
-            // Almacenar datos
-            tokens.value = decryptedData.tokens
-            systemData.value = decryptedData.systemData
-            user.value = decryptedData.user
-            isAuthenticated.value = true
+    const isAuthenticated = computed(() => {
+        return !!tokens.value?.access_token && !!user.value && !!systemData.value;
+    });
 
-            // Persistir estado
-            persistState()
-        } catch (error) {
-            console.error('Error al inicializar autenticación:', error)
-            clearState()
-            throw error
-        }
-    }
+    const navigationMenu = computed(() => {
+        return systemData.value?.modules.sort((a, b) => a.mod_order - b.mod_order) || [];
+    });
 
-    function persistState() {
-        localStorage.setItem('authState', JSON.stringify({
-            tokens: tokens.value,
-            systemData: systemData.value,
-            user: user.value,
-            isAuthenticated: true
-        }))
-    }
+    const userRoles = computed(() => systemData.value?.roles || []);
 
-    function clearState() {
-        tokens.value = null
-        systemData.value = null
-        user.value = null
-        isAuthenticated.value = false
-        localStorage.removeItem('authState')
-    }
-
-    // Getters útiles
-    function getModules(): Module[] {
-        return systemData.value?.modules || []
-    }
-
-    function getRoles(): Role[] {
-        return systemData.value?.roles || []
-    }
-
-    function hasPermission(actionKey: string): boolean {
+    const hasPermission = computed(() => {
+        return (actionKey: string) => {
         return systemData.value?.roles.some(role => 
-            role.roleModuleActions.some(action => 
-                action.moduleAction.actions.act_key_name === actionKey
-            )
-        ) || false
+            role.actions.some(action => action.act_key_name === actionKey)
+        ) || false;
+        };
+    });
+
+    const getSystemId = computed(() => systemData.value?.systemId || null)
+
+    function initializeAuth(authData: SystemLogin) {
+        tokens.value = authData.tokens;
+        user.value = authData.user;
+        systemData.value = authData.systemData;
+
+        persistAuthData(authData);
+    }
+    
+    function persistAuthData(authData: SystemLogin) {
+        sessionStorage.setItem('access_token', authData.tokens.access_token);
+        document.cookie = `refresh_token=${authData.tokens.refresh_token}; path=/; secure; samesite=strict; max-age=604800`; // 7 días
+    
+        // Guardar datos no sensibles en localStorage
+        localStorage.setItem('user', JSON.stringify(authData.user));
+        localStorage.setItem('systemData', JSON.stringify(authData.systemData));
+        localStorage.setItem('lastLogin', new Date().toISOString());
     }
 
-    function getAccessToken(): string | null {
-        return tokens.value?.access_token || null
-    }
-
-    function getRefreshToken(): string | null {
-        return tokens.value?.refresh_token || null
-    }
-
-    // Restaurar estado
-    const restoreState = () => {
-        const savedState = localStorage.getItem('authState')
-        if (savedState) {
-            const state = JSON.parse(savedState);
-            tokens.value = state.tokens;
-            systemData.value = state.systemData;
-            user.value = state.user;
-            isAuthenticated.value = true;
-        } else {
-            console.log('No hay estado guardado en localStorage.');
+    function loadPersistedData() {
+        try {
+            const persistedUser = localStorage.getItem('user');
+            const persistedSystemData = localStorage.getItem('systemData');
+            const accessToken = sessionStorage.getItem('access_token');
+            
+            if (persistedUser && persistedSystemData && accessToken) {
+                user.value = JSON.parse(persistedUser);
+                systemData.value = JSON.parse(persistedSystemData);
+                tokens.value = {
+                    access_token: accessToken,
+                    refresh_token: getRefreshTokenFromCookie()
+                };
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Error loading persisted data:', error);
+            clearAuth();
+            return false;
         }
     }
 
-    // Restaurar estado al iniciar
-    restoreState()
+    function getRefreshTokenFromCookie(): string {
+        const cookies = document.cookie.split(';');
+        const refreshTokenCookie = cookies.find(cookie => cookie.trim().startsWith('refresh_token='));
+        return refreshTokenCookie ? refreshTokenCookie.split('=')[1] : '';
+    }
+
+    function clearAuth() {
+        tokens.value = null;
+        user.value = null;
+        systemData.value = null;
+        
+        localStorage.removeItem('user');
+        localStorage.removeItem('systemData');
+        localStorage.removeItem('lastLogin');
+        sessionStorage.removeItem('access_token');
+
+        document.cookie = 'refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    }
 
     return {
         tokens,
-        systemData,
         user,
+        systemData,
         isAuthenticated,
-        initializeFromParams,
-        clearState,
-        getModules,
-        getRoles,
+        navigationMenu,
+        userRoles,
         hasPermission,
-        getAccessToken,
-        getRefreshToken
-    }
+        getSystemId,
+        initializeAuth,
+        loadPersistedData,
+        clearAuth
+    };
 })

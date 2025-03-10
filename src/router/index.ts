@@ -1,46 +1,97 @@
 import { useAuthStore } from '@/stores/auth'
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, type RouteLocationNormalized } from 'vue-router'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
+      path: '/auth/initialize',
+      name: 'auth-initialize',
+      component: () => import('@/views/AuthInitializer.vue'),
+      meta: { requiresAuth: false }
+    },
+    {
       path: '/dashboard',
+      name: 'dashboard',
       component: () => import('@/views/Dashboard.vue'),
       meta: { requiresAuth: true }
     },
     {
       path: '/unauthorized',
-      component: () => import('@/views/Unauthorized.vue')
+      name: 'unauthorized',
+      component: () => import('@/views/Unauthorized.vue'),
+      meta: { requiresAuth: false }
+    },
+    {
+      path: '/error',
+      name: 'error',
+      component: () => import('@/views/Error.vue'),
+      meta: { requiresAuth: false }
+    },
+    {
+      path: '/',
+      redirect: '/dashboard'
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      redirect: (to) => {
+        // Si hay un parámetro auth, redirigir a initialize
+        const urlParams = new URLSearchParams(window.location.search)
+        if (urlParams.has('auth')) {
+          return { path: '/auth/initialize', query: { auth: urlParams.get('auth') } }
+        }
+        return '/dashboard'
+      }
     }
   ],
 })
 
-router.beforeEach(async (to, from, next) => {
+const validateAccess = async (to: RouteLocationNormalized) => {
   const authStore = useAuthStore()
-  console.log(1)
-  if (!to.meta.requiresAuth) return next()
-    console.log(2)
-  if (authStore.isAuthenticated) return next()
-    console.log(3)
   
-  console.log(4)
+  // Si la ruta no requiere autenticación
+  if (!to.meta.requiresAuth) return true
+
+  // Si ya está autenticado, permitir acceso
+  if (authStore.isAuthenticated) return true
+
+  // Verificar si hay datos de autenticación en la URL
   const urlParams = new URLSearchParams(window.location.search)
-  console.log(5)
-  const authParam = urlParams.get('auth')
-  console.log(6)
+  const authData = urlParams.get('auth')
 
-  if (!authParam) return next('/unauthorized')
-  console.log(7)
+  if (authData) return true
 
+  const loaded = await authStore.loadPersistedData()
+
+  return loaded
+}
+
+router.beforeEach(async (to, from, next) => {
   try {
-    console.log(8)
-    await authStore.initializeFromParams(authParam!)
-    console.log(9)
-    window.history.replaceState({}, document.title, window.location.pathname)
-    return next()
+    if (!to.meta.requiresAuth) {
+      next()
+      return
+    }
+
+    const canAccess = await validateAccess(to)
+    
+    if (canAccess) {
+      next()
+    } else {
+      if (to.path !== '/unauthorized') {
+        next('/unauthorized')
+      } else {
+        next()
+      }
+    }
   } catch (error) {
-    return next('/unauthorized')
+    console.error('Navigation error:', error)
+    if (to.path !== '/unauthorized') {
+      next('/unauthorized')
+    } else {
+      next()
+    }
   }
 })
 
