@@ -1,19 +1,15 @@
 <script setup lang="ts">
     import { useAuthStore } from '../stores/auth';
-    import apiGatewayService from '../lib/axios';
-    import axios from 'axios'
+    import apiAuthenticationService from '../lib/axios';
+    import apiBackendService from '../lib/backend-config';
 
     const authStore = useAuthStore()
     const navigation = authStore.navigationMenu
-    const apiGatewayUrl = import.meta.env.VITE_API_GATEWAY_URL
 
     const logout = async() => {
-        const logoutService = await axios.create({
-            baseURL: apiGatewayUrl
-        })
         try {
-            await logoutService.post('/auth/system-logout', {
-                id: authStore.getSystemId
+            await apiAuthenticationService.post('/auth/system-logout', {
+                systemId: authStore.getSystemId
             })
         } catch (error) {
             console.log(error)
@@ -25,7 +21,16 @@
 
     const getDepartamentos = async() => {
         try {
-            const response = await apiGatewayService.get('departamentos')
+            const response = await apiBackendService.get('departamentos')
+            console.log(response.data)
+        } catch (error) {
+            console.log(error)
+        }
+    }
+
+    const getDatosIniciales = async() => {
+        try {
+            const response = await apiBackendService.get('denuncias/datos-iniciales')
             console.log(response.data)
         } catch (error) {
             console.log(error)
@@ -40,6 +45,7 @@
         </header>
         <main class="buttonContainer">
             <button @click="getDepartamentos">Ver departamentos</button>
+            <button @click="getDatosIniciales">Datos Iniciales</button>
         </main>
         <pre>
             {{ navigation }}
@@ -52,11 +58,13 @@
         display: flex;
         margin: 10px 0px;
         justify-content: center;
+        gap: 1rem;
     }
     .buttonContainer button {
         border: none;
         border-radius: 5px;
         width: auto;
         height: 30px;
+        cursor: pointer;
     }
 </style>

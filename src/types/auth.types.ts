@@ -1,7 +1,8 @@
 export interface SystemLogin {
-    tokens:     Tokens;
+    access_token:  string;
+    refresh_token: string;    
     systemData: SystemData;
-    user:       User;
+    userData:       any;
 }
 
 export interface SystemData {
@@ -34,11 +35,6 @@ export interface Role {
 export interface Actions {
     act_name:     string;
     act_key_name: string;
-}
-
-export interface Tokens {
-    access_token:  string;
-    refresh_token: string;
 }
 
 export interface User {

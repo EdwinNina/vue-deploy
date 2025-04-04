@@ -1,13 +1,13 @@
 import { useAuthStore } from '@/stores/auth'
 import axios from 'axios'
 
-const apiAuthenticationUrl = import.meta.env.VITE_API_AUTHENTICATION_URL
+const apiBackendUrl = import.meta.env.VITE_API_BACKEND_URL
 
-const apiAuthenticationService = axios.create({
-   baseURL: `${apiAuthenticationUrl}/api`
+const apiBackendService = axios.create({
+   baseURL: `${apiBackendUrl}/api`
 })
 
-apiAuthenticationService.interceptors.request.use( response => {
+apiBackendService.interceptors.request.use( response => {
    const store = useAuthStore()
    if(store.isAuthenticated) {
       const token = store.access_token
@@ -18,4 +18,4 @@ apiAuthenticationService.interceptors.request.use( response => {
    return response
 })
 
-export default apiAuthenticationService
+export default apiBackendService

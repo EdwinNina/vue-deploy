@@ -1,14 +1,15 @@
-import type { SystemData, SystemLogin, Tokens, User } from '@/types/auth.types';
+import type { SystemData, SystemLogin } from '@/types/auth.types';
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 export const useAuthStore = defineStore('auth', () => {
-    const tokens = ref<Tokens | null>(null);
-    const user = ref<User | null>(null);
+    const access_token = ref<string|null>(null);
+    const refresh_token = ref<string|null>(null);
+    const user = ref();
     const systemData = ref<SystemData | null>(null);
 
     const isAuthenticated = computed(() => {
-        return !!tokens.value?.access_token && !!user.value && !!systemData.value;
+        return !!access_token.value && !!user.value && !!systemData.value;
     });
 
     const navigationMenu = computed(() => {
@@ -28,19 +29,19 @@ export const useAuthStore = defineStore('auth', () => {
     const getSystemId = computed(() => systemData.value?.systemId || null)
 
     function initializeAuth(authData: SystemLogin) {
-        tokens.value = authData.tokens;
-        user.value = authData.user;
+        access_token.value = authData.access_token;
+        user.value = authData.userData;
         systemData.value = authData.systemData;
 
         persistAuthData(authData);
     }
     
     function persistAuthData(authData: SystemLogin) {
-        sessionStorage.setItem('access_token', authData.tokens.access_token);
-        document.cookie = `refresh_token=${authData.tokens.refresh_token}; path=/; secure; samesite=strict; max-age=604800`; // 7 días
+        sessionStorage.setItem('access_token', authData.access_token);
+        document.cookie = `refresh_token=${authData.refresh_token}; path=/; secure; samesite=strict; max-age=604800`; // 7 días
     
         // Guardar datos no sensibles en localStorage
-        localStorage.setItem('user', JSON.stringify(authData.user));
+        localStorage.setItem('user', JSON.stringify(authData.userData));
         localStorage.setItem('systemData', JSON.stringify(authData.systemData));
         localStorage.setItem('lastLogin', new Date().toISOString());
     }
@@ -54,10 +55,8 @@ export const useAuthStore = defineStore('auth', () => {
             if (persistedUser && persistedSystemData && accessToken) {
                 user.value = JSON.parse(persistedUser);
                 systemData.value = JSON.parse(persistedSystemData);
-                tokens.value = {
-                    access_token: accessToken,
-                    refresh_token: getRefreshTokenFromCookie()
-                };
+                access_token.value = accessToken
+                refresh_token.value = getRefreshTokenFromCookie()
                 return true;
             }
             return false;
@@ -75,7 +74,8 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     function clearAuth() {
-        tokens.value = null;
+        access_token.value = null;
+        refresh_token.value = null;
         user.value = null;
         systemData.value = null;
         
@@ -88,7 +88,8 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     return {
-        tokens,
+        access_token,
+        refresh_token,
         user,
         systemData,
         isAuthenticated,
