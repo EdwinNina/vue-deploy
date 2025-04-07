@@ -36,6 +36,15 @@
             console.log(error)
         }
     }
+
+    const getDatosFiltro = async() => {
+        try {
+            const response = await apiBackendService.get('denuncias/datos-filtro')
+            console.log(response.data)
+        } catch (error) {
+            console.log(error)
+        }
+    }
 </script>
 
 <template>
@@ -46,6 +55,7 @@
         <main class="buttonContainer">
             <button @click="getDepartamentos">Ver departamentos</button>
             <button @click="getDatosIniciales">Datos Iniciales</button>
+            <button @click="getDatosFiltro">Datos Filtro</button>
         </main>
         <pre>
             {{ navigation }}
